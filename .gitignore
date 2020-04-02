@@ -1,1 +1,7 @@
 *.log
+*.bak*
+bin/
+.settings
+lib/javadoc
+*.html
+
