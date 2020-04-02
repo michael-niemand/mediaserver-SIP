@@ -1,0 +1,274 @@
+package de.fhffm.research.audio.mixer;
+
+import org.gstreamer.Caps;
+import org.gstreamer.Element;
+import org.gstreamer.ElementFactory;
+
+import org.gstreamer.Gst;
+
+import org.gstreamer.Pad;
+import org.gstreamer.PadLinkReturn;
+import org.gstreamer.Pipeline;
+import org.gstreamer.State;
+import org.gstreamer.elements.good.RTPBin;
+
+
+
+public class AudioMixer {
+	
+	private final static String CAPABILITY = "application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU";
+	
+	//private final static int MSECOND = 1000; 
+	
+	private int RECV_PORT 		= 5000;	
+	private int PARTICIPANTS	= 4;
+	private int QUEUETIME		= 20;
+	
+	private int counter = 0;
+	private Participant[] participants;
+	
+	/****************************************************************************
+	 * GST_Variables
+	 ****************************************************************************/
+	private Pipeline pipe;
+	// elements for sending out the mixed data
+//	private Element mixer;
+//	private Element encoder;
+//	private Element packetizer;
+//	private Element multiudpsink;
+//	private Element rtpmuxer;
+	private RTPBin rtpbin;
+	private Element udpsrc;
+	private Element[] udpsinks;
+	
+	public void start(){
+		// Initialize Gstreamer
+		
+		Gst.init();
+		
+		// create the Pipeline
+		pipe = new Pipeline("AudioMixer");
+		//pipe.set("delay", MSECOND);
+		
+		// TODO: replace with real multiudpsink
+		//multiudpsink = ElementFactory.make("multiudpsink", "sink");
+		//multiudpsink.set("sync", false);
+		// TODO: remove this it is only for testing
+		//multiudpsink.set("clients", "192.168.0.101:5050,192.168.0.112:5050,");
+		//multiudpsink.set("clients", "10.0.0.18:5050");
+		//multiudpsink.
+		
+//		rtpmuxer = ElementFactory.make("rtpmux", "rtpmuxer");
+//		rtpmuxer.set("seqnum-offset", "-1"); 	// -1 = Default = random
+//		rtpmuxer.set("timestamp-offset","-1"); 	// -1 = Default = random
+		
+		// create the elements for the participants
+		participants = new Participant[PARTICIPANTS];
+		for(int i=0; i < PARTICIPANTS; i++){
+			participants[i] = new Participant(PARTICIPANTS);
+			participants[i].setQueueSize(QUEUETIME);
+			participants[i].init();			
+		}
+		// create as many udpsinks as participants
+		udpsinks = new Element[PARTICIPANTS];
+		for(int i=0; i < PARTICIPANTS; i++){
+			udpsinks[i] = ElementFactory.make("udpsink", "udpsink_" + i);
+			udpsinks[i].set("sync", false);
+			//udpsinks[i].set("port", "505"+i);
+		}
+		
+		// TODO: this is for testing only
+		udpsinks[0].set("clients", "192.168.0.101:5050");
+		udpsinks[1].set("clients", "192.168.0.112:5050");
+		udpsinks[2].set("clients", "192.168.0.101:5051");
+		udpsinks[3].set("clients", "192.168.0.112:5051");
+		
+		/***************************************************
+		* create the receiver for RTP
+		****************************************************/
+	
+		udpsrc = ElementFactory.make("udpsrc", "udpsrc");
+		udpsrc.set("port", RECV_PORT);
+		udpsrc.set("caps", new Caps(CAPABILITY));
+		
+		rtpbin = (RTPBin) ElementFactory.make("gstrtpbin", "rtpbin");
+		
+        pipe.addMany(rtpbin, udpsrc);
+        // link the udpsrc with rtpbin
+		Pad sinkpad = rtpbin.getRequestPad("recv_rtp_sink_0");
+		Pad srcpad = udpsrc.getStaticPad("src");
+		srcpad.link(sinkpad);
+
+		/***************************************************
+		* create the sender for RTP
+		****************************************************/		
+		
+        for(int i=0; i < PARTICIPANTS; i++){
+        	pipe.addMany(participants[i].getElements());
+        	pipe.addMany(participants[i].getQueues());
+        	pipe.addMany(udpsinks[i]);
+        }    
+        
+        //pipe.addMany(rtpmuxer, udpsinks[1]);
+       // Element.linkMany(rtpmuxer, udpsinks[1]);
+        
+        
+        System.out.println(pipe.toString());
+        for(int i=0; i < PARTICIPANTS; i++){
+        	Element.linkMany(participants[i].getElements());
+        }
+        
+		/***************************************************
+		* create the SSRC-SDES-listener
+		****************************************************/    
+
+        rtpbin.connect(new RTPBin.ON_NEW_SSRC() {
+        	
+			@Override
+			public void onNewSsrc(RTPBin rtpbin, int sessid, int ssrc) {
+				//System.out.println("new SSRC!!");
+				
+				//Pointer ptr;
+		
+//				Maybe this way: Extract CNAME (Python)
+//				*************************************************				
+//			        session = rtpbin.emit("get-internal-session", sessid)
+//			        source = session.emit("get-source-by-ssrc", ssrc)
+//			        sdes = source.get_property('sdes')
+//			        cname = str(sdes['cname'])				
+				
+				
+				//Element session = ElementFactory.make("gstrtpsession", "session");
+				//rtpbin.emit("get-internal-session", sessid, session);
+				
+				//session.get("sources");
+	
+				
+				
+				
+
+//		  g_object_get (session, "sources", &arr, NULL);
+//		  for (i = 0; i < arr->n_values; i++) {
+//		    GObject *source;
+//		    val = g_value_array_get_nth (arr, i);
+//		    source = g_value_get_object (val);
+//		    print_source_stats (source);
+//		  }
+//		  g_value_array_free (arr);
+//		  g_object_unref (session);			
+				
+				
+				
+				
+					
+				
+				
+//	            Pointer p = GValueAPI.GVALUE_NOMAPPER_API.g_value_get_object(rtpbin.getPointer("get-source-by-ssrc"));
+				//System.out.println(NativeObject.objectFor(rtpbin.getPointer("get-source-by-ssrc"), StreamInfo.class, -1, true));
+				
+				//session.emit("get-source-by-ssrc", ssrc);
+				//System.out.println(source.sdes);
+
+			    //if (sdes != null) {
+					   //sdes = GValueAPI.GVALUE_NOMAPPER_API.g_value_get_object(value);
+					   //streamInfo = NativeObject.objectFor(p, StreamInfo.class, -1, true);
+			    //}
+
+			}
+        
+        });
+        
+		/***************************************************
+		* create the new-participant-listener
+		****************************************************/
+        
+        rtpbin.connect(new Element.PAD_ADDED() {			
+        	@Override
+        	public void padAdded(Element element, Pad pad) {   
+         		
+        		PadLinkReturn linkOk;
+        		String padNameSendRtpSrc = "send_rtp_src";
+        		String padNameSendRtpSink = "send_rtp_sink";
+        		
+				// retrieve the elements of the current participant ...
+				//System.out.println("Participant " + (counter + 1) + " added");
+				Element[] elements = participants[counter].getElements();	  
+        		
+        		System.out.println("----------------------------------------------");
+        		System.out.println("NEW PAD: " + pad.getName());
+        		
+        		// when the new pad is a send rtp sink
+        		if (pad.getName().indexOf(padNameSendRtpSink)>-1){
+         			return;
+        		}	
+        		
+        		// when the new pad is a send-rtp-src, link it to one of the udpsinks sink
+        		if (pad.getName().indexOf(padNameSendRtpSrc)>-1){
+        			//pipe.add(udpsinks[counter]);
+        			linkOk = pad.link(udpsinks[counter].getStaticPad("sink"));
+    				System.out.println("LINK send-rtp-src --> udpsink" + counter + "'s sink: " + linkOk);	
+        			
+        			//linkOk = pad.link(rtpmuxer.getRequestPad("sink_%d"));
+        			//System.out.println("LINK send-rtp-src --> rtpmuxer-sink: " + linkOk);
+        			return;
+        		}
+         		
+        		// only when max number of participants not yet reached 
+        		if(counter > PARTICIPANTS){
+        			return;
+        		}
+        		// only when pad is not linked yet (which should never occur, cuz its a new pad!)
+				if(pad.isLinked()){
+					System.out.println("niemals");
+					return;
+				}
+				
+				//... and link the newly added pad to the sink of the current participants depacketizer (elements[0])
+				linkOk = pad.link(elements[0].getStaticPad("sink"));
+				System.out.println("LINK recv-rtp-src --> participant_" + counter + " depay-sink: " + linkOk);
+				
+				for(int i=0; i < PARTICIPANTS; i++){
+					//only the OTHER participants get this - not the current p!
+					// link all participants queues to the mixer of current participant
+					if(!(participants[i].equals(participants[counter]))){
+						linkOk = participants[i].getQueues()[counter].getStaticPad("src").link(elements[3].getRequestPad("sink%d"));
+						System.out.println("LINK participant_" + i + " queue_" + counter + "-src --> participant_" + counter + " mixer-sink: " + linkOk);
+
+						}
+					}
+				
+				//Request SEND RTP SINK from RTPBIN and link it to packetizer of current oarticipant
+				linkOk = elements[5].getStaticPad("src").link(rtpbin.getRequestPad("send_rtp_sink_%d"));
+				// (new SEND RTP SRC gets created)
+				System.out.println("LINK participant_" + counter + " pay-src --> rtpbin send_rtp_sink: " + linkOk);     
+				
+
+				
+				counter++;
+				
+        	}
+        });
+       
+        
+		/***************************************************
+		* get the whole thing going
+		****************************************************/
+		
+		pipe.setState(State.READY);         
+		pipe.setState(State.PLAYING);
+		Gst.main();
+		
+		pipe.setState(State.NULL);
+		pipe.stop();
+		Gst.deinit();
+	}
+	
+	public static void main(String[] args) {
+		AudioMixer videoBridge = new AudioMixer();
+		videoBridge.start();
+	}
+	
+
+
+
+}
